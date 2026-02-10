@@ -1,0 +1,12 @@
+{
+  "name": "krystark-mono-repo",
+  "private": true,
+  "version": "1.0.0",
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "i:web": "npm install -w @krystark/mono-pero-test",
+    "dev:web": "npm -w @krystark/mono-pero-test run dev",
+    "build:web": "npm -w @krystark/mono-pero-test run build"
+  },
+  "engines": { "node": ">=20.0.0" }
+}

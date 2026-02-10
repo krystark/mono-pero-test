@@ -1,0 +1,55 @@
+{
+  "name": "@krystark/app-kit",
+  "version": "0.0.1",
+  "type": "module",
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com",
+    "access": "restricted"
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": [
+    "dist/**"
+  ],
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "clean": "rimraf dist",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "prepublishOnly": "npm run clean && npm run build"
+  },
+  "peerDependencies": {
+    "@tanstack/react-query": ">=5",
+    "mobx": ">=6",
+    "mobx-react-lite": ">=4",
+    "react": ">=18",
+    "react-dom": ">=18",
+    "zod": "^3.23"
+  },
+  "dependencies": {
+    "@krystark/app-kernel": "*",
+    "@krystark/app-kit": "*",
+    "@krystark/app-icons": "*",
+    "ky": "^1.5.0",
+    "tailwind-merge": "^3.3.1",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.24",
+    "@types/react-dom": "^18.3.7",
+    "rimraf": "^6.0.1",
+    "typescript": "^5.9.2"
+  },
+  "overrides": {
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
+  }
+}

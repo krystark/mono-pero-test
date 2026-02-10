@@ -1,0 +1,4 @@
+User-Agent: *
+Disallow: /
+Sitemap: https://test.ru/sitemap.xml
+Host: test.ru

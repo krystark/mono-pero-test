@@ -1,0 +1,28 @@
+{
+  "background_color": "#fff",
+  "description": "Тестовое приложение Работы с продуктами",
+  "dir": "ltr",
+  "display": "fullscreen",
+  "name": "Работы с продуктами",
+  "orientation": "portrait",
+  "scope": "/",
+  "short_name": "Работы с продуктами",
+  "start_url": "/",
+  "id": "/",
+  "theme_color": "#fff",
+  "display_override": ["fullscreen", "standalone", "minimal-ui"],
+  "categories": [
+    "erm"
+  ],
+  "icons": [
+    {
+      "src": "/favicon/android-chrome-512x512.png",
+      "sizes": "512x512"
+    },
+    {
+      "src": "/favicon/android-chrome-512x512.png",
+      "sizes": "any"
+    }
+  ],
+  "lang": "ru"
+}

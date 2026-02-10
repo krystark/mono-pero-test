@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "baseUrl": ".",
+    "types": ["vite/client"],
+    "paths": {
+      "@krystark/app-kernel": ["../../packages/kernel/src"],
+      "@krystark/app-contracts": ["../../packages/contracts/src"],
+      "@krystark/app-common": ["../../packages/common/src"],
+      "@krystark/ui-kit": ["../../packages/ui-kit/src"],
+      "@krystark/ui-icons": ["../../packages/ui-icons/src"]
+    }
+  },
+  "include": ["src", "vite.config.ts", "tailwind.config.ts", "postcss.config.js"]
+}
