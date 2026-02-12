@@ -541,22 +541,22 @@ const ProductsPage = observer(function ProductsPage() {
                 <div className="flex items-center justify-between">
                     <div className="text-[20px] font-semibold text-black/85">Все позиции</div>
 
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-4">
                         <button
                             onClick={() => refetch()}
-                            className="h-[44px] w-[44px] rounded-[12px] border border-[#E6E8EE] grid place-items-center hover:bg-black/5"
+                            className="h-[44px] w-[44px] rounded-[6px] border border-solid border-[#ECECEB] bg-white grid place-items-center hover:bg-black/[0.02]"
                             aria-label="Обновить"
                         >
-                            <IconRefresh className="h-5 w-5 text-black/50" />
+                            <IconRefresh className="h-[24px] w-[24px] text-[#515161]" />
                         </button>
 
                         <button
                             onClick={openAdd}
-                            className="h-[44px] rounded-[12px] bg-[#242EDB] px-5 text-white font-semibold text-[14px] flex items-center gap-3 hover:bg-[#1f28c8]"
+                            className="h-[44px] rounded-[6px] bg-[#242EDB] px-[26px] text-white font-semibold text-[16px] flex items-center gap-[18px] hover:bg-[#1f28c8]"
                         >
-                <span className="h-6 w-6 rounded-full border border-white/35 grid place-items-center">
-                  <IconPlus className="h-4 w-4 text-white" />
-                </span>
+                            <span className="h-[28px] w-[28px] rounded-full border-2 border-white grid place-items-center">
+                              <IconPlus className="h-[18px] w-[18px] text-white" />
+                            </span>
                             Добавить
                         </button>
                     </div>
