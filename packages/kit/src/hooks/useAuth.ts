@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { getStore, bus, User } from '@krystark/app-kernel';
+import { getStore, User } from '@krystark/app-kernel';
 
 function normalizeUser(v: unknown): User | null {
     if (!v || typeof v !== 'object') return null;
@@ -27,12 +27,6 @@ export function useAuth() {
             store.setUser(null);
         } else if ('user' in (store ?? {})) {
             try { store.user = { id: 0 }; } catch {}
-        }
-
-        if (bus?.publish) {
-            bus.publish('auth:logout', { reason });
-        } else if ((bus as any)?.emit) {
-            (bus as any).emit('auth:logout', { reason });
         }
     };
 

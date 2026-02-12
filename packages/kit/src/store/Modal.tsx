@@ -1,100 +1,100 @@
-import React from "react";
-import { makeAutoObservable } from 'mobx';
+// packages/kit/src/store/Modal.ts
+import { makeAutoObservable } from "mobx";
+import type { ReactNode } from "react";
 
-export type ModalId = string;
-export type RenderFn = (close: () => void) => React.ReactNode;
+export type ModalKind = "card" | "node";
 
-export type OpenRawParams = {
-    content: React.ReactNode | RenderFn;
-    closeOnBackdrop?: boolean; // default: true
-    closeOnEsc?: boolean;      // default: true
-    lockScroll?: boolean;      // default: true
-    zIndex?: number;           // default: 1000 + index
-    wrapperClassName?: string; // tailwind-классы для внешней обёртки
-};
+export type ModalEntry = {
+    id: string;
+    kind: ModalKind;
 
-export type OpenCardParams = OpenRawParams & {
     title?: string;
-    showClose?: boolean;       // default: true
+    showClose?: boolean;
     cardClassName?: string;
     contentClassName?: string;
-    maxWidth?: number | string; // <-- расширили
-    imageOnly?: boolean;        // <-- опционально, если используешь
-};
-
-type BaseEntry = {
-    id: ModalId;
-    closeOnBackdrop: boolean;
-    closeOnEsc: boolean;
-    lockScroll: boolean;
-    zIndex: number;
-    wrapperClassName: string;
-    content: React.ReactNode | RenderFn;
-};
-
-export type RawEntry = BaseEntry & { kind: 'raw' };
-
-export type CardEntry = BaseEntry & {
-    kind: 'card';
-    title?: string;
-    showClose: boolean;
-    cardClassName?: string;
-    contentClassName?: string;
-    maxWidth: number | string;
+    wrapperClassName?: string;
+    maxWidth?: number | string;
     imageOnly?: boolean;
+
+    // behavior
+    lockScroll?: boolean; // default true
+    closeOnEsc?: boolean; // default true
+    closeOnBackdrop?: boolean; // default true
+
+    // z
+    zIndex?: number;
+
+    // content
+    content: ReactNode | ((close: () => void) => ReactNode);
 };
 
-export type ModalEntry = RawEntry | CardEntry;
+export type OpenModalInput =
+    Omit<ModalEntry, "id" | "kind" | "lockScroll" | "closeOnEsc" | "closeOnBackdrop"> & {
+    id?: string;
+    kind?: ModalKind;
+    lockScroll?: boolean;
+    closeOnEsc?: boolean;
+    closeOnBackdrop?: boolean;
+};
 
-// type-guards
-export const isCard = (m: ModalEntry): m is CardEntry => m.kind === 'card';
-export const isRaw  = (m: ModalEntry): m is RawEntry  => m.kind === 'raw';
+function genId() {
+    try {
+        return crypto.randomUUID();
+    } catch {
+        return `m_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+    }
+}
 
 export class ModalsStore {
     stack: ModalEntry[] = [];
 
-    constructor() { makeAutoObservable(this); }
-
-    openRaw(p: OpenRawParams) {
-        const id: ModalId = `m_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
-        const entry: RawEntry = {
-            id, kind: 'raw',
-            closeOnBackdrop: p.closeOnBackdrop ?? true,
-            closeOnEsc: p.closeOnEsc ?? true,
-            lockScroll: p.lockScroll ?? true,
-            zIndex: p.zIndex ?? 1000,
-            wrapperClassName: p.wrapperClassName ?? '',
-            content: p.content,
-        };
-        this.stack.push(entry);
-        return { id, close: () => this.close(id) };
+    constructor() {
+        makeAutoObservable(this, {}, { autoBind: true });
     }
 
-    openCard(p: OpenCardParams) {
-        const id: ModalId = `m_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
-        const entry: CardEntry = {
-            id, kind: 'card',
-            closeOnBackdrop: p.closeOnBackdrop ?? true,
-            closeOnEsc: p.closeOnEsc ?? true,
-            lockScroll: p.lockScroll ?? true,
-            zIndex: p.zIndex ?? 1000,
-            wrapperClassName: p.wrapperClassName ?? '',
-            content: p.content,
-            title: p.title,
-            showClose: p.showClose ?? true,
-            cardClassName: p.cardClassName,
-            contentClassName: p.contentClassName,
-            maxWidth: p.maxWidth ?? 720,
-            imageOnly: p.imageOnly ?? false,
-        };
-        this.stack.push(entry);
-        return { id, close: () => this.close(id) };
+    get top(): ModalEntry | null {
+        return this.stack.length ? this.stack[this.stack.length - 1] : null;
     }
 
-    close(id: ModalId) { this.stack = this.stack.filter(m => m.id !== id); }
-    closeTop() { this.stack.pop(); }
-    closeAll() { this.stack = []; }
+    get hasLockScroll(): boolean {
+        return this.stack.some((m) => m.lockScroll !== false);
+    }
 
-    get hasLockScroll() { return this.stack.some(m => m.lockScroll !== false); }
-    get top() { return this.stack[this.stack.length - 1]; }
+    open(input: OpenModalInput): string {
+        const {
+            id: inputId,
+            kind,
+            lockScroll,
+            closeOnEsc,
+            closeOnBackdrop,
+            ...rest
+        } = input;
+
+        const id = inputId ?? genId();
+
+        const entry: ModalEntry = {
+            id,
+            kind: kind ?? "card",
+            lockScroll: lockScroll ?? true,
+            closeOnEsc: closeOnEsc ?? true,
+            closeOnBackdrop: closeOnBackdrop ?? true,
+            ...rest,
+        };
+
+        this.stack.push(entry);
+        return id;
+    }
+
+    close(id: string) {
+        const idx = this.stack.findIndex((m) => m.id === id);
+        if (idx >= 0) this.stack.splice(idx, 1);
+    }
+
+    closeTop() {
+        if (this.stack.length) this.stack.pop();
+    }
+
+    clear() {
+        this.stack = [];
+    }
 }

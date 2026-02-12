@@ -13,3 +13,12 @@ export interface User {
     /** Токен */
     token?: string;
 }
+
+export interface IUserStore {
+    data: User | null;
+    setData(user: User | null): void;
+    readonly isAuthorized: boolean;
+}
+export interface IRootStore {
+    user: IUserStore;
+}

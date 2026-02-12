@@ -1,0 +1,27 @@
+// to 420
+@mixin from-mobile {
+  @media (min-width: 420px) {
+    @content;
+  }
+}
+
+// to 768
+@mixin from-tablet {
+  @media (min-width: 768px) {
+    @content;
+  }
+}
+
+// to 1200
+@mixin from-desktop {
+  @media (min-width: 1200px) {
+    @content;
+  }
+}
+
+// to 1500
+@mixin from-large {
+  @media (min-width: 1500px) {
+    @content;
+  }
+}

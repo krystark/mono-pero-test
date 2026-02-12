@@ -1,10 +1,10 @@
 import { getStore } from '@krystark/app-kernel';
-import { getAuthTokenFromStorage } from '@krystark/app-common';
+import { getAuthTokenFromStorage } from '@krystark/app-kit';
 
 /** Сначала пробуем store.user.token, иначе берём из storage */
 export function getAuthToken(): string | null {
     try {
-        const store = getStore();             // может бросить, если setStore() ещё не был вызван
+        const store = getStore();
         const fromStore = (store as any)?.user?.token as string | undefined;
         if (fromStore) return fromStore ?? null;
     } catch {

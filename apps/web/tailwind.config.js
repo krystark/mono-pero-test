@@ -17,10 +17,15 @@ const config: Config = {
     content,
     theme: {
         extend: {
-            // позже добавим сюда палитру/радиусы из фигмы (или через css variables)
-        }
+            fontFamily: {
+                // чтобы можно было юзать font-sans и оно брало var(--font-family)
+                sans: ["var(--font-family)", "system-ui", "Segoe UI", "Arial", "sans-serif"],
+                inter: ["var(--font-family-inter)", "system-ui", "Segoe UI", "Arial", "sans-serif"],
+                roboto: ["var(--font-family-roboto)", "system-ui", "Segoe UI", "Arial", "sans-serif"],
+            },
+        },
     },
-    plugins: []
+    plugins: [],
 };
 
 export default config;

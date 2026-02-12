@@ -1,0 +1,23 @@
+:root {
+  /* ---------- Sizes ---------- */
+  --html-min-width: 320px;
+  --container: 100%;
+
+  /* ---------- Typography ---------- */
+  --font-family-inter: 'Inter';
+  --font-family-roboto: 'Roboto';
+
+  /* ---------- Typography ---------- */
+  --color-black: '#232323';
+  --color-white: '#E0E0E0';
+  --color-secondary: '#CACACA';
+
+  /* ScrollBar */
+  --sb-size: 6px;                            /* толщина вертикального и горизонтального скролла */
+  --sb-radius: 4px;                          /* скругление ползунка */
+  --sb-track: var(--background-secondary);   /* трек (фон дорожки) */
+  --sb-thumb: var(--violet-main);            /* ползунок (бегунок) */
+  --sb-thumb-hover: var(--violet-700);       /* ползунок при hover */
+  --sb-thumb-active: var(--violet-400);      /* ползунок при active/drag */
+  --sb-corner: transparent;                  /* уголок при пересечении горизонт/вертикаль */
+}

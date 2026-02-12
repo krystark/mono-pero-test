@@ -1,55 +1,78 @@
-import { makeAutoObservable } from 'mobx';
-import type { User, Notification, NotificationLevel, IRootStore } from '@krystark/app-contracts';
+// app/store/rootStore.ts
+import { makeAutoObservable } from "mobx";
+import type { User, IUserStore, IRootStore } from "@krystark/app-kernel";
+import { markRegistryMutation } from "@krystark/app-kernel";
 
-// ===== User store =====
-export class UserData {
-    data: User | null = null;
-    constructor() { makeAutoObservable(this); }
-    setData(user: User | null) { this.data = user; }
-    get isAuthorized() { return !!this.data?.id; }
-}
-
-// ===== Notifications store =====
-export class NotificationsStore {
-    list: Notification[] = [];
-
-    constructor() { makeAutoObservable(this); }
-
-    add(n: Omit<Notification, 'id' | 'createdAt'> & Partial<Pick<Notification, 'id' | 'createdAt'>>) {
-        const item: Notification = {
-            id: n.id ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
-            createdAt: n.createdAt ?? Date.now(),
-            title: n.title,
-            level: n.level as NotificationLevel, // если level приходит как строка, приведи к enum до вызова
-            source: n.source,
-            message: n.message,
-        };
-        this.list.unshift(item);
-    }
-
-    remove(id: string) {
-        this.list = this.list.filter(x => x.id !== id);
-    }
-
-    clear() { this.list = []; }
-}
-
-// ===== Modules registry =====
 export class ModulesRegistry {
-    map = new Map<string, unknown>();
-    constructor() { makeAutoObservable(this); }
-    register<T>(id: string, store: T) { this.map.set(id, store); }
-    get<T>(id: string): T | undefined { return this.map.get(id) as T | undefined; }
+    registry = new Map<string, unknown>();
+
+    constructor() {
+        makeAutoObservable(this, { registry: false }, { autoBind: true });
+    }
+
+    get<T>(key: string): T | undefined {
+        return this.registry.get(key) as T | undefined;
+    }
+
+    has(key: string): boolean {
+        return this.registry.has(key);
+    }
+
+    register(key: string, value: unknown) {
+        this.registry.set(key, value);
+        markRegistryMutation();
+    }
+
+    unregister(key: string) {
+        if (this.registry.delete(key)) {
+            markRegistryMutation();
+        }
+    }
+
+    clear() {
+        if (this.registry.size) {
+            this.registry.clear();
+            markRegistryMutation();
+        }
+    }
 }
 
-// ===== Root store =====
-// Если где-то требуют именно IRootStore — явно "implements"
+export class UserData implements IUserStore {
+    token: string | null = null;
+    data: User | null = null;
+
+    constructor() {
+        makeAutoObservable(this, {}, { autoBind: true });
+    }
+
+    setData(user: User | null) {
+        this.data = user;
+    }
+
+    setAuth(token: string | null, user: User | null) {
+        this.token = token;
+        this.data = user;
+    }
+
+    clearAuth() {
+        this.token = null;
+        this.data = null;
+    }
+
+    get isAuthorized() {
+        return !!this.token && !!this.data?.id;
+    }
+}
+
 export class RootStore implements IRootStore {
-    notifications = new NotificationsStore();
+    [key: string]: unknown;
+
     modules = new ModulesRegistry();
     user = new UserData();
 
-    constructor() { makeAutoObservable(this); }
+    constructor() {
+        makeAutoObservable(this, { modules: false }, { autoBind: true });
+    }
 }
 
 export const rootStore = new RootStore();

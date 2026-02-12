@@ -25,4 +25,3 @@ export * from "./conponents/HorizontalScroller";
 export * from "./conponents/ModalRoot";
 export * from "./conponents/ToastRoot";
 export * from "./conponents/ApiForm";
-export * from "./conponents/MediaLightbox";

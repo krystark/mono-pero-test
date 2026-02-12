@@ -1,222 +1,270 @@
+// hooks/useBootstrapAuth.ts
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { getStore } from "@krystark/app-kernel";
-import type { User } from "@krystark/app-contracts";
-import { safeStorage, USER_STORAGE_KEY, getJSON, useBxQuery, getBxBaseUrl } from "@krystark/app-common";
-import { applyUserRoutesAccess } from "../adapters/applyUserRoutesAccess";
+
+export type DummyUser = {
+    id: number;
+    username: string;
+    email?: string;
+    firstName?: string;
+    lastName?: string;
+    image?: string;
+    [k: string]: any;
+};
 
 type BootstrapResult = {
     token: string | null;
-    user: User | null;
+    user: DummyUser | null;
     isChecking: boolean;
     checkFinished: boolean;
     isAuthorized: boolean;
     errorCode?: number;
 };
 
-type BxUser = Record<string, any> & { routes?: string[] | null; groups?: number[] | null; is_admin?: boolean };
+type ApiError = Error & { status?: number; data?: unknown };
 
-function readTokenFromStorage(): string | null {
+const AUTH_STORAGE_KEY = "mono.auth";
+const AUTH_EVENT = "mono-auth-changed";
+const RUNTIME_TOKEN_KEY = "__monoAuthToken__";
+
+const AUTH_BASE_URL =
+    (import.meta.env.VITE_AUTH_API_URL as string) || "https://dummyjson.com";
+
+function joinUrl(base: string, path: string) {
+    return base.replace(/\/+$/, "") + "/" + path.replace(/^\/+/, "");
+}
+
+function safeGetStorage(kind: "local" | "session"): Storage | null {
     try {
-        const raw = safeStorage.get(USER_STORAGE_KEY);
-        const parsed = raw ? JSON.parse(raw) : null;
-        return parsed?.token ?? null;
+        return kind === "local" ? window.localStorage : window.sessionStorage;
     } catch {
         return null;
     }
 }
 
-function stripTokenFromUrl(param = "token") {
-    const url = new URL(window.location.href);
-
-    if (url.searchParams.has(param)) {
-        url.searchParams.delete(param);
+function readRuntimeToken(): string | null {
+    try {
+        const t = (window as any)[RUNTIME_TOKEN_KEY];
+        return typeof t === "string" && t ? t : null;
+    } catch {
+        return null;
     }
-
-    if (url.hash) {
-        const hashParams = new URLSearchParams(url.hash.replace(/^#/, ""));
-        if (hashParams.has(param)) {
-            hashParams.delete(param);
-            url.hash = hashParams.toString() ? `#${hashParams.toString()}` : "";
-        }
-    }
-
-    window.history.replaceState(null, "", url.toString());
 }
 
-function asNumArray(v: any): number[] {
-    if (!Array.isArray(v)) return [];
-    return v.map((x) => Number(x)).filter((n) => Number.isFinite(n));
+function readAuthFromStorage(): { accessToken: string | null; refreshToken: string | null } {
+    const read = (s: Storage | null) => {
+        if (!s) return null;
+        try {
+            const raw = s.getItem(AUTH_STORAGE_KEY);
+            if (!raw) return null;
+
+            // поддержим и "просто строка токена", и JSON
+            if (!raw.trim().startsWith("{")) {
+                return { accessToken: raw, refreshToken: null };
+            }
+
+            const parsed = JSON.parse(raw) as any;
+            return {
+                accessToken: parsed?.accessToken ?? parsed?.token ?? null,
+                refreshToken: parsed?.refreshToken ?? null,
+            };
+        } catch {
+            return null;
+        }
+    };
+
+    // приоритет: runtime → local → session
+    const rt = readRuntimeToken();
+    if (rt) return { accessToken: rt, refreshToken: null };
+
+    return (
+        read(safeGetStorage("local")) ??
+        read(safeGetStorage("session")) ?? { accessToken: null, refreshToken: null }
+    );
+}
+
+function writeAuthToStorage(accessToken: string, refreshToken: string | null) {
+    // runtime
+    try {
+        (window as any)[RUNTIME_TOKEN_KEY] = accessToken;
+    } catch {}
+
+    const payload = JSON.stringify({ accessToken, refreshToken });
+
+    // пишем туда, где уже лежало, иначе — в session
+    const ls = safeGetStorage("local");
+    const ss = safeGetStorage("session");
+
+    const hasLocal = !!ls?.getItem(AUTH_STORAGE_KEY);
+    const hasSession = !!ss?.getItem(AUTH_STORAGE_KEY);
+
+    try {
+        if (hasLocal) ls?.setItem(AUTH_STORAGE_KEY, payload);
+        else if (hasSession) ss?.setItem(AUTH_STORAGE_KEY, payload);
+        else ss?.setItem(AUTH_STORAGE_KEY, payload);
+    } catch {}
+
+    window.dispatchEvent(new Event(AUTH_EVENT));
+}
+
+function clearAuthStorage() {
+    try {
+        safeGetStorage("local")?.removeItem(AUTH_STORAGE_KEY);
+        safeGetStorage("session")?.removeItem(AUTH_STORAGE_KEY);
+    } catch {}
+    try {
+        (window as any)[RUNTIME_TOKEN_KEY] = null;
+    } catch {}
+    window.dispatchEvent(new Event(AUTH_EVENT));
+}
+
+async function fetchMe(accessToken: string): Promise<DummyUser> {
+    const res = await fetch(joinUrl(AUTH_BASE_URL, "auth/me"), {
+        method: "GET",
+        headers: {
+            Accept: "application/json",
+            Authorization: `Bearer ${accessToken}`,
+        },
+        // credentials тут НЕ нужны для Bearer; оставим выключенным чтобы не ловить ограничения cookies
+    });
+
+    const ct = res.headers.get("content-type") || "";
+    const data = /\bjson\b/i.test(ct) ? await res.json() : await res.text();
+
+    if (!res.ok) {
+        const err: ApiError = new Error("Auth error");
+        err.status = res.status;
+        err.data = data;
+        throw err;
+    }
+
+    return data as DummyUser;
+}
+
+async function refreshAccessToken(refreshToken: string): Promise<{ accessToken: string; refreshToken?: string }> {
+    const res = await fetch(joinUrl(AUTH_BASE_URL, "auth/refresh"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ refreshToken, expiresInMins: 30 }),
+    });
+
+    const ct = res.headers.get("content-type") || "";
+    const data = /\bjson\b/i.test(ct) ? await res.json() : await res.text();
+
+    if (!res.ok) {
+        const err: ApiError = new Error("Refresh error");
+        err.status = res.status;
+        err.data = data;
+        throw err;
+    }
+
+    const json = data as any;
+    const accessToken = json?.accessToken ?? null;
+    if (!accessToken) throw new Error("No accessToken in refresh response");
+    return { accessToken, refreshToken: json?.refreshToken };
 }
 
 export function useBootstrapAuth(): BootstrapResult {
-    const store = getStore();
-    const [searchParams] = useSearchParams();
-    const location = useLocation();
-    const [token, setToken] = useState<string | null>(null);
+    const [{ accessToken, refreshToken }, setAuth] = useState(() => readAuthFromStorage());
 
-    // === 0) извлекаем/фиксируем токен
     useEffect(() => {
-        let fromUrl = searchParams.get("token");
+        const sync = () => setAuth(readAuthFromStorage());
 
-        if (!fromUrl && location.hash) {
-            const hp = new URLSearchParams(location.hash.replace(/^#/, ""));
-            fromUrl = hp.get("token") ?? null;
-        }
+        const onStorage = (e: StorageEvent) => {
+            if (e.key !== AUTH_STORAGE_KEY) return;
+            sync();
+        };
 
-        if (fromUrl) {
-            safeStorage.set(USER_STORAGE_KEY, JSON.stringify({ token: fromUrl }));
-            setToken(fromUrl);
-            stripTokenFromUrl("token");
-            return;
-        }
+        window.addEventListener("storage", onStorage);
+        window.addEventListener(AUTH_EVENT, sync);
 
-        const fromStorage = readTokenFromStorage();
-        if (fromStorage) {
-            setToken(fromStorage);
-            return;
-        }
+        return () => {
+            window.removeEventListener("storage", onStorage);
+            window.removeEventListener(AUTH_EVENT, sync);
+        };
+    }, []);
 
-        if (import.meta.env.DEV && import.meta.env.VITE_TEST_USER_AUTH_TOKEN) {
-            const fromDev = String(import.meta.env.VITE_TEST_USER_AUTH_TOKEN);
-            safeStorage.set(USER_STORAGE_KEY, JSON.stringify({ token: fromDev }));
-            setToken(fromDev);
-            return;
-        }
+    const shouldCheck = !!accessToken;
 
-        setToken(null);
-    }, [searchParams, location.hash]);
-
-    const shouldCheckPortal = !!token;
-    const baseUrl = import.meta.env.VITE_API_URL as string;
-
-    // === 1) портал: проверка по токену
     const {
-        data: portalUser,
-        error: portalError,
-        isFetching: isPortalFetching,
-        isFetched: isPortalFetched,
-    } = useQuery<User>({
-        queryKey: ["user", token],
-        enabled: shouldCheckPortal,
+        data: user,
+        error,
+        isFetching,
+        isFetched,
+    } = useQuery<DummyUser, ApiError>({
+        queryKey: ["auth-me", accessToken],
+        enabled: shouldCheck,
         retry: false,
-        queryFn: () => getJSON<User>("user", { token, baseUrl }),
+        queryFn: async () => {
+            try {
+                return await fetchMe(accessToken!);
+            } catch (e: any) {
+                const status = e?.status;
+
+                if (status === 404) {
+                    clearAuthStorage();
+                    throw e;
+                }
+
+                if ((status === 401 || status === 403) && refreshToken) {
+                    const next = await refreshAccessToken(refreshToken);
+                    writeAuthToStorage(next.accessToken, next.refreshToken ?? refreshToken);
+                    return await fetchMe(next.accessToken);
+                }
+
+                throw e;
+            }
+        },
     });
 
-    // === 2) bitrix LEGACY: отключаем в локальной dev, либо по явному флагу
-    const isDev = import.meta.env.DEV === true;
-    const skipBxByEnv =
-        String(import.meta.env.VITE_SKIP_BX_AUTH ?? "").toLowerCase() === "true" ||
-        String(import.meta.env.VITE_SKIP_BX_AUTH ?? "").toLowerCase() === "1";
-
-    const bxBaseExists = Boolean(getBxBaseUrl());
-    const bxCheckEnabled = bxBaseExists && !isDev && !skipBxByEnv;
-
-    const {
-        data: bxResp,
-        error: bxError,
-        isFetching: isBxFetching,
-        isFetched: isBxFetched,
-    } = useBxQuery<BxUser>(["auth"], "/portal/auth/", { enabled: bxCheckEnabled, retry: false } as any);
-
-    // === 2.1) сопоставление Bitrix ID
-    const portalBitrixId = (portalUser as any)?.bitrix_id as string | number | undefined;
-    const bxUserId = (bxResp?.data as any)?.ID ?? (bxResp?.data as any)?.id ?? undefined;
-
-    const bxIdMatchesPortal =
-        !bxCheckEnabled || !portalBitrixId || bxUserId == null ? true : String(portalBitrixId) === String(bxUserId);
-
-    const portalOk = Boolean((portalUser as any)?.id);
-
-    const bxOk = !bxCheckEnabled ? true : bxResp?.status?.code === 200 && !!bxResp?.data && bxIdMatchesPortal;
-
-    const bxRoutes =
-        bxOk && bxCheckEnabled
-            ? Array.isArray((bxResp?.data as any)?.routes)
-                ? (((bxResp!.data as any).routes ?? []) as string[])
-                : []
-            : [];
-
-    const bxGroups = bxOk && bxCheckEnabled ? asNumArray((bxResp?.data as any)?.groups) : [];
-    const bxIsAdmin =
-        bxOk && bxCheckEnabled
-            ? Boolean((bxResp?.data as any)?.is_admin || (bxResp?.data as any)?.isAdmin) || bxGroups.includes(1)
-            : false;
-
-    // === 3) сайд-эффект: кладём в стор
     useEffect(() => {
-        if (!shouldCheckPortal) {
-            store?.user?.setData?.(null as any);
-            return;
-        }
+        if (!user?.id || !accessToken) return;
 
-        if (portalOk) {
-            const patch: any = { ...(portalUser as any), token: token ?? undefined };
-
-            patch.bitrix = bxCheckEnabled ? (bxOk ? bxResp!.data! : null) : null;
-
-            // routes: теперь НИЧЕГО не значит "пустой => админ"
-            patch.routes = bxCheckEnabled && bxOk ? bxRoutes : [];
-
-            // прокидываем признаки админа/группы в общий user, чтобы UI умел определять админа
-            if (bxCheckEnabled && bxOk) {
-                if (Array.isArray((bxResp?.data as any)?.groups)) patch.groups = (bxResp?.data as any)?.groups;
-                if ((bxResp?.data as any)?.is_admin !== undefined) patch.is_admin = (bxResp?.data as any)?.is_admin;
-                if ((bxResp?.data as any)?.isAdmin !== undefined) patch.isAdmin = (bxResp?.data as any)?.isAdmin;
+        try {
+            const store = getStore() as any;
+            // если у тебя есть setAuth — отлично
+            if (typeof store?.user?.setAuth === "function") {
+                store.user.setAuth(accessToken, {
+                    id: user.id,
+                    email: user.email,
+                    name: user.firstName,
+                    last_name: user.lastName,
+                    token: accessToken,
+                });
+            } else if (typeof store?.user?.setData === "function") {
+                store.user.setData({
+                    id: user.id,
+                    email: user.email,
+                    name: user.firstName,
+                    last_name: user.lastName,
+                    token: accessToken,
+                });
             }
+        } catch {}
+    }, [user, accessToken]);
 
-            store?.user?.setData?.(patch);
-        } else if (isPortalFetched) {
-            store?.user?.setData?.(null as any);
-        }
-    }, [
-        shouldCheckPortal,
-        portalOk,
-        portalUser,
-        token,
-        bxCheckEnabled,
-        bxOk,
-        bxResp,
-        bxRoutes,
-        isPortalFetched,
-        store,
-    ]);
-
-    // === 4) агрегированное состояние гейта
-    const isChecking = (shouldCheckPortal && isPortalFetching) || (bxCheckEnabled && isBxFetching);
-    const checkFinished = (!shouldCheckPortal || isPortalFetched) && (!bxCheckEnabled || isBxFetched);
-    const isAuthorized = portalOk && bxOk;
-
-    const portalErrCode = portalOk ? undefined : ((portalError as any)?.status ?? (portalError as any)?.code);
-
-    const bxErrCode =
-        !bxCheckEnabled || bxOk
-            ? undefined
-            : (bxResp?.status?.code ?? (bxError as any)?.status ?? (bxError as any)?.code);
-
-    const errorCode = isAuthorized ? undefined : (portalErrCode ?? bxErrCode);
-
-    // === 5) применяем allowlist (только PROD + только когда Bitrix включён и гейт прошёл)
     useEffect(() => {
-        if (!bxCheckEnabled) return;
-        if (!isAuthorized) return;
-        if (import.meta.env.DEV) return;
+        const code = error?.status;
+        if (code === 401 || code === 403) {
+            clearAuthStorage();
+        }
+    }, [error]);
 
-        applyUserRoutesAccess(bxRoutes, { isAdmin: bxIsAdmin });
-    }, [bxCheckEnabled, isAuthorized, bxRoutes, bxIsAdmin]);
+    const isAuthorized = !!user?.id;
+    const isChecking = shouldCheck ? isFetching : false;
+    const checkFinished = !shouldCheck || isFetched;
+    const errorCode = !isAuthorized ? (error?.status ?? undefined) : undefined;
 
     return useMemo(
         () => ({
-            token: token ?? null,
-            user: isAuthorized
-                ? ({ ...(portalUser as any), token: token ?? undefined, routes: bxRoutes } as User)
-                : null,
+            token: accessToken,
+            user: isAuthorized ? (user ?? null) : null,
             isChecking,
             checkFinished,
             isAuthorized,
-            errorCode: errorCode as number | undefined,
+            errorCode,
         }),
-        [token, portalUser, isAuthorized, isChecking, checkFinished, errorCode, bxRoutes]
+        [accessToken, user, isAuthorized, isChecking, checkFinished, errorCode]
     );
 }

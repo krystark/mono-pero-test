@@ -7,10 +7,10 @@ export type ToastItem = {
     id: string;
     content: React.ReactNode;
     variant?: ToastVariant;
-    duration?: number;         // мс (по умолчанию 5000)
+    duration?: number;
     onClose?: () => void;
     createdAt: number;
-    closing?: boolean;         // ← для exit-анимации
+    closing?: boolean;
 };
 
 export class ToastsStore {

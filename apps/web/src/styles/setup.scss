@@ -1,8 +1,8 @@
 // Дизайн токены и boilerplate
-@use "@krystark/ui-kit-theme/scss/reset" as *;
-@use "@krystark/ui-kit-theme/scss/variables" as *;
-@use "@krystark/ui-kit-theme/scss/mixins" as *;
-@use "@krystark/ui-kit-theme/scss/setup" as *;
+@use "./setup/reset";
+@use "./setup/variables";
+@use "./setup/mixins";
+@use "./setup/setup";
 
 // Tailwind
 @tailwind base;
@@ -14,9 +14,4 @@ html {
   font-weight: 500;
   color: rgb(var(--text-primary));
   background: rgb(var(--background-secondary));
-}
-
-.cv-auto {
-  content-visibility: auto;
-  contain-intrinsic-size: 44px 44px;
 }

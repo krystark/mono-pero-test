@@ -12,7 +12,9 @@
     "strict": true
   },
   "include": [
-    "ui", "packages", "index.ts", "types"
+    "ui",
+    "src/packages",
+    "src/index.ts", "types"
   ],
   "exclude": ["**/*.stories.tsx", "**/*.test.tsx"]
 }

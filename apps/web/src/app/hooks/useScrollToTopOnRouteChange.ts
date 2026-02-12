@@ -5,9 +5,9 @@ import { useLocation } from "react-router-dom";
 type Options = {
     /** 'smooth' или 'auto' */
     behavior?: ScrollBehavior;
-    /** Если у тебя скролл не у window, а у контейнера (например, #app-root) */
+    /** Если скролл не у window, а у контейнера (например, #app-root) */
     containerSelector?: string;
-    /** Вдруг захочешь временно отключать */
+    /** временно отключать */
     disabled?: boolean;
     /** Не скроллить при смене hash (#anchor) внутри страницы */
     skipHashChange?: boolean;
